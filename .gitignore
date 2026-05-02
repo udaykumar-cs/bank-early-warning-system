@@ -1,0 +1,59 @@
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ========================
+# Virtual Environments
+# ========================
+bank_ews_env/
+flask_api/venv/
+venv/
+.venv/
+env/
+
+# ========================
+# Jupyter Notebooks
+# ========================
+.ipynb_checkpoints/
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+*.env
+
+# ========================
+# Database
+# ========================
+flask_api/instance/
+*.db
+*.sqlite3
+
+# ========================
+# Logs
+# ========================
+flask_api/logs/
+*.log
+
+# ========================
+# IDE & OS
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
+
+# ========================
+# Distribution / Packaging
+# ========================
+dist/
+build/
+*.egg-info/
+*.egg
