@@ -140,10 +140,17 @@ See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for full documentation.
 ## Tech Stack
 
 - **ML**: XGBoost, scikit-learn, SHAP
-- **API**: Flask, SQLAlchemy, SQLite
+- **API**: Flask, SQLAlchemy, SQLite, Flask-Limiter
 - **Data**: pandas, numpy
 - **Visualization**: matplotlib, seaborn
+- **Testing**: pytest
+
+## Author
+
+**Uday Kumar**  
+📧 Email: [kumaruday9973@gmail.com](mailto:kumaruday9973@gmail.com)  
+🔗 GitHub: [udaykumar-cs](https://github.com/udaykumar-cs)  
 
 ## License
 
-This project is for educational/research purposes.
+This project is for educational and research purposes.
