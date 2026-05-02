@@ -8,9 +8,11 @@ import sys
 import io
 
 # Fix Windows console encoding
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+if sys.platform == 'win32' and 'pytest' not in sys.modules:
+    if hasattr(sys.stdout, 'buffer'):
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    if hasattr(sys.stderr, 'buffer'):
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 import numpy as np
 import joblib
@@ -18,6 +20,8 @@ from flask import Flask, request, jsonify, g, send_file
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from config import Config
 from models import db, Prediction, ModelPerformance, ApiLog
@@ -32,6 +36,14 @@ CORS(app)
 
 # Initialize database
 db.init_app(app)
+
+# Initialize rate limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[f"{Config.RATE_LIMIT} per minute"],
+    storage_uri="memory://"
+)
 
 # Setup logging
 if not os.path.exists('logs'):
@@ -99,10 +111,39 @@ def identify_risk_factors(features):
         risks.append(f"Low CRAR: {features['crar_total']:.1f}% < 10.5%")
     if features.get('credit_growth', 0) > 20:
         risks.append(f"Rapid credit growth: {features['credit_growth']:.1f}% > 20%")
-    if features.get('net_profit', 0) < 0:
-        risks.append(f"Loss making: Net profit is negative")
+    if features.get('repo_rate', 0) > 8:
+        risks.append(f"High Repo Rate Environment: {features['repo_rate']}%")
+        
+    if not risks:
+        risks.append("All primary risk indicators are within normal limits")
+        
+    return risks
+
+def validate_features(features):
+    """Validate that features are mathematically possible."""
+    errors = []
     
-    return risks if risks else ["All metrics within normal ranges"]
+    # Percentages
+    if 'crar_total' in features and not (0 <= features['crar_total'] <= 200):
+        errors.append("crar_total must be between 0 and 200%")
+    if 'npa_ratio' in features and not (0 <= features['npa_ratio'] <= 100):
+        errors.append("npa_ratio must be between 0 and 100%")
+    if 'repo_rate' in features and features['repo_rate'] < 0:
+        errors.append("repo_rate cannot be negative")
+    if 'credit_growth' in features and features['credit_growth'] < -100:
+        errors.append("credit_growth cannot be less than -100%")
+        
+    # Absolute amounts
+    if 'total_provisions' in features and features['total_provisions'] < 0:
+        errors.append("total_provisions cannot be negative")
+    if 'interest_income' in features and features['interest_income'] < 0:
+        errors.append("interest_income cannot be negative")
+    if 'interest_expense' in features and features['interest_expense'] < 0:
+        errors.append("interest_expense cannot be negative")
+    if 'operating_expense' in features and features['operating_expense'] < 0:
+        errors.append("operating_expense cannot be negative")
+        
+    return errors
 
 
 def get_model_mode(stress_prevalence=None):
@@ -190,6 +231,7 @@ def root():
 
 
 @app.route('/dashboard')
+@limiter.exempt
 def dashboard():
     """Serve the interactive dashboard"""
     return send_file('dashboard.html')
@@ -262,6 +304,10 @@ def predict():
     missing_features = set(Config.FEATURE_COLUMNS) - set(features.keys())
     if missing_features:
         return jsonify({'error': f'Missing features: {list(missing_features)}'}), 400
+        
+    validation_errors = validate_features(features)
+    if validation_errors:
+        return jsonify({'error': 'Input validation failed', 'details': validation_errors}), 422
     
     try:
         stress_prevalence = data.get('stress_prevalence')
@@ -369,6 +415,17 @@ def predict_batch():
     for bank in banks:
         try:
             features = bank['features']
+            
+            # Input validation
+            validation_errors = validate_features(features)
+            if validation_errors:
+                errors.append({
+                    'bank_name': bank.get('bank_name', 'Unknown'),
+                    'error': 'Input validation failed',
+                    'details': validation_errors
+                })
+                continue
+                
             feature_values = [features[col] for col in Config.FEATURE_COLUMNS]
             feature_array = np.array([feature_values])
             
