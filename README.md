@@ -1,5 +1,11 @@
 # 🏦 Bank Early Warning System (EWS)
 
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-2.3.3-lightgrey?logo=flask&logoColor=white)
+![XGBoost](https://img.shields.io/badge/XGBoost-1.7.0+-orange?logo=xgboost&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.8.0-F7931E?logo=scikit-learn&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+
 An end-to-end Machine Learning system that predicts financial stress in Indian banks **12 months in advance** using RBI (Reserve Bank of India) data.
 
 ## Features
@@ -7,12 +13,29 @@ An end-to-end Machine Learning system that predicts financial stress in Indian b
 - **Dual-Model Architecture** — Automatically switches between Crisis and Rare Event models based on current stress prevalence
 - **SHAP Explainability** — Full feature-level explanations for every prediction
 - **Time-Based Backtesting** — Walk-forward validation across 2019–2025
-- **Production REST API** — Flask API with SQLite audit trail
+- **Production REST API** — Flask API with SQLite audit trail, input validation, and rate limiting
 - **Interactive Dashboard** — Predict stress for any bank in real time
+
+## System Architecture
+
+```mermaid
+graph TD
+    A[User / Dashboard] -->|JSON Payload| B(Flask API)
+    B -->|Input Validation| C{Rate Limiter}
+    C -->|Pass| D[Feature Scaler]
+    C -->|Fail 429| Z[Block Request]
+    D --> E{Stress Prevalence?}
+    E -->|< 15%| F[Rare Event XGBoost]
+    E -->|>= 15%| G[Crisis XGBoost]
+    F --> H[Prediction & Probability]
+    G --> H
+    H --> I[(SQLite DB: Audit Trail)]
+    H --> J[Return JSON Response]
+```
 
 ## Project Structure
 
-```
+```text
 Bank_EWS_Project/
 ├── raw_data/           # 7 RBI Excel source files
 ├── cleaned_data/       # Intermediate cleaned CSVs
@@ -29,17 +52,27 @@ Bank_EWS_Project/
 │   ├── config.py       # Configuration
 │   ├── models.py       # Database models
 │   ├── dashboard.html  # Interactive dashboard
+│   ├── tests/          # Pytest suite
 │   └── requirements.txt
 ├── outputs/            # SHAP plots, backtest charts
 └── docs/               # API documentation
 ```
 
+## Prerequisites
+
+Before installing the project, ensure you have the following installed on your machine:
+- **Python 3.11** (Highly recommended for package compatibility)
+- **Git** (For version control and cloning the repository)
+
 ## Quick Start
 
 ### 1. Setup
 
+Clone the repository and set up your virtual environment:
+
 ```bash
-cd flask_api
+git clone https://github.com/udaykumar-cs/bank-early-warning-system.git
+cd bank-early-warning-system/flask_api
 python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # macOS/Linux
@@ -55,7 +88,7 @@ SECRET_KEY=your-random-secret-key-here
 LOG_LEVEL=INFO
 ```
 
-Generate a secure key:
+Generate a secure key using:
 ```bash
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
@@ -67,6 +100,18 @@ python app.py
 ```
 
 The API starts at `http://localhost:5000`. Visit `http://localhost:5000/dashboard` for the interactive UI.
+
+## Running Tests
+
+This project uses `pytest` for automated endpoint testing and input validation checking.
+
+To run the test suite, ensure you are in the `flask_api` directory with your virtual environment activated, then run:
+
+```bash
+pytest tests/ -v
+```
+
+This will run tests for API endpoints, JSON structure, and mathematical bounds checks.
 
 ## API Endpoints
 
@@ -134,8 +179,34 @@ See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for full documentation.
 
 | Mode | Threshold | When Used |
 |------|-----------|-----------|
-| **Crisis** | 0.50 | Stress prevalence ≥ 15% |
+| **Crisis** | 0.50 | Stress prevalence >= 15% |
 | **Rare Event** | 0.85 | Stress prevalence < 15% |
+
+## Troubleshooting
+
+Here are 4 common issues and how to fix them:
+
+**1. `RuntimeError: SECRET_KEY environment variable is not set.`**
+* **Solution**: Ensure you have created a `.env` file in the `flask_api` folder and added `SECRET_KEY=your-key`.
+
+**2. `No module named 'numpy._core'` or `scipy` errors during startup.**
+* **Solution**: This is a dependency mismatch between numpy 1.x and 2.x. Run `pip install --upgrade numpy scipy scikit-learn` in your virtual environment.
+
+**3. `422 Unprocessable Entity: Input validation failed`**
+* **Solution**: You passed mathematically impossible data (e.g., negative NPA ratio or negative total provisions). Check your JSON payload.
+
+**4. `503 Service Unavailable: Models not loaded`**
+* **Solution**: Check `flask_api/config.py` to ensure `MODEL_CRISIS_PATH`, `MODEL_RARE_PATH`, and `SCALER_PATH` are pointing to the correct absolute paths on your machine.
+
+## Contributing
+
+We welcome contributions! Please follow these guidelines:
+1. Fork the repository.
+2. Create a new branch for your feature (`git checkout -b feature/AmazingFeature`).
+3. Ensure all tests pass (`pytest tests/`).
+4. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+5. Push to the branch (`git push origin feature/AmazingFeature`).
+6. Open a Pull Request.
 
 ## Tech Stack
 
@@ -145,11 +216,12 @@ See [docs/API_REFERENCE.md](docs/API_REFERENCE.md) for full documentation.
 - **Visualization**: matplotlib, seaborn
 - **Testing**: pytest
 
-## Author
+## Author & Contact
 
 **Uday Kumar**  
 📧 Email: [kumaruday9973@gmail.com](mailto:kumaruday9973@gmail.com)  
 🔗 GitHub: [udaykumar-cs](https://github.com/udaykumar-cs)  
+🐛 Issues: [Report a Bug or Request a Feature](https://github.com/udaykumar-cs/bank-early-warning-system/issues)
 
 ## License
 
